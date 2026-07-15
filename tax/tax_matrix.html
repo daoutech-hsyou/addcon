@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>배송상품/쿠폰 증빙 발행 룰 매트릭스</title>
+<style>
+  :root{ --line:#d9dde3; --head:#1f3b57; --head2:#2f5573; --zebra:#f5f8fb;
+         --ok:#e3f5e8; --okb:#1a7f37; --no:#f7eaea; --nob:#b42318; --warn:#fff4e5; --warnb:#b25e00; }
+  *{box-sizing:border-box}
+  body{font-family:'Malgun Gothic','Apple SD Gothic Neo',Arial,sans-serif;color:#1f2733;margin:0;padding:32px;line-height:1.5;background:#fff}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:#5a6673;font-size:13px;margin-bottom:24px}
+  h2{font-size:17px;margin:34px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--head)}
+  h3{font-size:14px;margin:20px 0 8px;color:var(--head2)}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin-bottom:10px}
+  th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+  thead th{background:var(--head);color:#fff;font-weight:600}
+  tbody tr:nth-child(even){background:var(--zebra)}
+  .grp{background:var(--head2)!important;color:#fff;font-weight:700}
+  .ok{color:var(--okb);font-weight:700}
+  .no{color:var(--nob);font-weight:700}
+  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:700}
+  .pill.ok{background:var(--ok)}
+  .pill.no{background:var(--no)}
+  .warn{background:var(--warn);color:var(--warnb);font-weight:600}
+  .note{background:#f0f4f8;border-left:4px solid var(--head2);padding:10px 14px;font-size:12.5px;margin:10px 0;border-radius:0 6px 6px 0}
+  code{background:#eef2f6;padding:1px 5px;border-radius:4px;font-family:Consolas,monospace;font-size:12px}
+  ul{margin:6px 0 12px;padding-left:20px}
+  li{margin:3px 0;font-size:12.5px}
+  .disc{margin-top:30px;padding:12px 16px;background:#fffbe6;border:1px solid #f0d97a;border-radius:6px;font-size:12px;color:#6b5900}
+  @media print{body{padding:0}h2{page-break-after:avoid}table{page-break-inside:auto}tr{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+
+<h1>배송상품 · 쿠폰 증빙 발행 룰 매트릭스</h1>
+<div class="sub">B2C 쿠폰/배송상품 판매 서비스 · 회원유형 × 결제수단 × 상품유형 기준 · 작성일 2026-07-15 · <b>세무사·관할 세무서 최종 검토 필요</b></div>
+
+<div class="note">
+<b>대원칙</b> ① 충전 = 선수금 → 충전 시점 무발행, 실제 공급(배송 인도/즉시결제 완료) 시점에만 발행. &nbsp;
+② 한 거래에 적격증빙(세금계산서·계산서·현금영수증·카드전표)은 1개만(이중발급 금지). &nbsp;
+③ 거래명세서는 적격증빙이 아님 → 세무증빙과 별도 관리·표기. &nbsp;
+④ 결제사(PG·휴대폰결제대행·간편결제)가 자체 발행하는 건 우리가 구현하지 않음(중복 방지).
+</div>
+
+<h2>1. 과세 배송상품 (부가세 과세)</h2>
+<table>
+<thead><tr><th>회원유형</th><th>주문/결제 수단</th><th>발행 증빙</th><th>과세형태</th><th>발행 주체</th><th>우리 구현</th><th>발행 시점</th><th>비고 / 리스크</th></tr></thead>
+<tbody>
+<tr><td rowspan="6">개인 (선불)</td><td>충전잔액</td><td>현금영수증</td><td>과세</td><td>우리</td><td class="ok">O</td><td>주문완료(결제완료) 즉시</td><td>자진발급 기한 5일, 가급적 기명(휴대폰번호)</td></tr>
+<tr><td>즉시-신용카드</td><td>카드매출전표</td><td>-</td><td>PG/카드사</td><td class="no">X</td><td>결제 시</td><td>현금영수증·세계 추가발행 금지</td></tr>
+<tr><td>즉시-휴대폰결제</td><td>현금영수증</td><td>과세</td><td>휴대폰결제 대행사</td><td class="no">X</td><td>결제 시</td><td>대행사 발급 여부 연동 스펙 확인</td></tr>
+<tr><td>즉시-가상계좌</td><td>현금영수증</td><td>과세</td><td>우리</td><td class="ok">O</td><td>입금확인 즉시</td><td>우리가 직접 수취 → 직접 발행</td></tr>
+<tr><td>즉시-전용계좌(이체)</td><td>현금영수증</td><td>과세</td><td>우리</td><td class="ok">O</td><td>입금확인 즉시</td><td>우리가 직접 수취 → 직접 발행</td></tr>
+<tr><td>즉시-네이버/카카오페이</td><td>카드전표 or 현금영수증</td><td>-</td><td>간편결제사</td><td class="no">X</td><td>결제 시</td><td>결제원천(카드/머니)에 따라 결제사 발행</td></tr>
+<tr><td rowspan="6">기업 (선불)</td><td>충전잔액</td><td>세금계산서</td><td>과세</td><td>우리</td><td class="ok">O</td><td>월합산(월초) 또는 건별</td><td>사업자번호 기준</td></tr>
+<tr><td>즉시-신용카드</td><td>카드매출전표</td><td>-</td><td>PG/카드사</td><td class="no">X</td><td>결제 시</td><td>카드전표(부가세 별도구분)로 매입공제. 세계 발급 제한</td></tr>
+<tr><td>즉시-휴대폰결제</td><td class="warn">증빙 없음 ⚠️</td><td>-</td><td>-</td><td class="no">X</td><td>-</td><td class="warn">법인 현금영수증 비대상·세계 불가 → "세계 필요시 가상/전용계좌" 안내</td></tr>
+<tr><td>즉시-가상계좌</td><td>세금계산서</td><td>과세</td><td>우리</td><td class="ok">O</td><td>월합산 또는 건별</td><td>우리가 직접 수취 → 직접 발행</td></tr>
+<tr><td>즉시-전용계좌(이체)</td><td>세금계산서</td><td>과세</td><td>우리</td><td class="ok">O</td><td>월합산 또는 건별</td><td>우리가 직접 수취 → 직접 발행</td></tr>
+<tr><td>즉시-네이버/카카오페이</td><td class="warn">카드전표/현금영수증 ⚠️</td><td>-</td><td>간편결제사</td><td class="no">X</td><td>결제 시</td><td class="warn">세금계산서 불가(PG중개). 카드연동분만 공제 가능</td></tr>
+<tr><td>기업 (후불)</td><td>후불 월정산</td><td>세금계산서(월합계)</td><td>과세</td><td>우리</td><td class="ok">O</td><td>월 정산 시</td><td>여신/미수금 관리 연계</td></tr>
+</tbody>
+</table>
+
+<h2>2. 면세 배송상품 (부가세 면세)</h2>
+<div class="note">과세와 <b>증빙 종류가 다름</b>: 기업 대상은 <b>세금계산서 → 계산서(면세계산서)</b>. 현금영수증은 <b>과세형태=비과세, 부가세=0</b>. <b>한 장에 과세+면세 혼재 불가</b>.</div>
+<table>
+<thead><tr><th>회원유형</th><th>주문/결제 수단</th><th>발행 증빙</th><th>과세형태</th><th>발행 주체</th><th>우리 구현</th><th>발행 시점</th><th>비고 / 리스크</th></tr></thead>
+<tbody>
+<tr><td rowspan="6">개인 (선불)</td><td>충전잔액</td><td>현금영수증</td><td>비과세(면세)</td><td>우리</td><td class="ok">O</td><td>주문완료 즉시</td><td>tax=0</td></tr>
+<tr><td>즉시-신용카드</td><td>카드매출전표</td><td>-</td><td>PG/카드사</td><td class="no">X</td><td>결제 시</td><td>-</td></tr>
+<tr><td>즉시-휴대폰결제</td><td>현금영수증</td><td>비과세(면세)</td><td>휴대폰결제 대행사</td><td class="no">X</td><td>결제 시</td><td>-</td></tr>
+<tr><td>즉시-가상계좌</td><td>현금영수증</td><td>비과세(면세)</td><td>우리</td><td class="ok">O</td><td>입금확인 즉시</td><td>tax=0</td></tr>
+<tr><td>즉시-전용계좌(이체)</td><td>현금영수증</td><td>비과세(면세)</td><td>우리</td><td class="ok">O</td><td>입금확인 즉시</td><td>tax=0</td></tr>
+<tr><td>즉시-네이버/카카오페이</td><td>카드전표 or 현금영수증</td><td>-</td><td>간편결제사</td><td class="no">X</td><td>결제 시</td><td>-</td></tr>
+<tr><td rowspan="6">기업 (선불)</td><td>충전잔액</td><td><b>계산서</b>(면세)</td><td>면세</td><td>우리</td><td class="ok">O</td><td>월합산 또는 건별</td><td>세금계산서 아님</td></tr>
+<tr><td>즉시-신용카드</td><td>카드매출전표</td><td>-</td><td>PG/카드사</td><td class="no">X</td><td>결제 시</td><td>-</td></tr>
+<tr><td>즉시-휴대폰결제</td><td class="warn">증빙 없음 ⚠️</td><td>-</td><td>-</td><td class="no">X</td><td>-</td><td class="warn">법인 현금영수증 비대상 → 안내</td></tr>
+<tr><td>즉시-가상계좌</td><td><b>계산서</b>(면세)</td><td>면세</td><td>우리</td><td class="ok">O</td><td>월합산 또는 건별</td><td>-</td></tr>
+<tr><td>즉시-전용계좌(이체)</td><td><b>계산서</b>(면세)</td><td>면세</td><td>우리</td><td class="ok">O</td><td>월합산 또는 건별</td><td>-</td></tr>
+<tr><td>즉시-네이버/카카오페이</td><td class="warn">카드전표/현금영수증 ⚠️</td><td>-</td><td>간편결제사</td><td class="no">X</td><td>결제 시</td><td class="warn">계산서 불가(PG중개)</td></tr>
+<tr><td>기업 (후불)</td><td>후불 월정산</td><td><b>계산서</b>(월합계, 면세)</td><td>면세</td><td>우리</td><td class="ok">O</td><td>월 정산 시</td><td>과세분은 세금계산서로 별도</td></tr>
+</tbody>
+</table>
+
+<h2>3. 쿠폰 (상품권성 전제)</h2>
+<div class="note">쿠폰이 <b>금액형/상품권성(화폐대용)</b>일 때만 아래가 성립(판매=재화공급 아님 → 비과세). 쿠폰이 특정 재화·용역 교환권이거나 우리가 직접 공급자면 과세될 수 있음 → <b>세무 확정 필요</b>.</div>
+<table>
+<thead><tr><th>회원유형</th><th>주문/결제 수단</th><th>판매(주문) 시점</th><th>우리 구현</th><th>비고</th></tr></thead>
+<tbody>
+<tr><td>개인 (선불)</td><td>충전잔액 / 즉시결제 전 수단</td><td>발행 없음(비과세)</td><td class="no">X</td><td>사용(교환) 시점은 공급자가 별도 발행</td></tr>
+<tr><td>기업 (선불)</td><td>충전잔액 / 즉시결제 전 수단</td><td>발행 없음(비과세)</td><td class="no">X</td><td>중개·판매수수료는 발행처에 세금계산서(B2B) 별도</td></tr>
+<tr><td>기업 (후불)</td><td>후불 월정산</td><td>발행 없음(비과세)</td><td class="no">X</td><td>-</td></tr>
+</tbody>
+</table>
+
+<h2>4. 현금영수증 발급 API 이용 기준 (개인, 즉시/주문완료 발행)</h2>
+<p style="font-size:12.5px;margin:4px 0">문서 단위로 <code>taxationType</code>은 <b>과세 또는 비과세 하나만</b> 지정. 필드 구성: <code>supplyCost</code>(공급가액) + <code>tax</code>(부가세) + <code>serviceFee</code>(봉사료) = <code>totalAmount</code>(거래금액).</p>
+<table>
+<thead><tr><th>주문 구성</th><th>taxationType</th><th>supplyCost</th><th>tax</th><th>totalAmount</th><th>API 호출</th></tr></thead>
+<tbody>
+<tr><td>순수 과세</td><td>과세</td><td>결제액 / 1.1</td><td>결제액 / 11</td><td>결제액</td><td>1회</td></tr>
+<tr><td>순수 면세</td><td>비과세</td><td>결제액 전체</td><td>0</td><td>결제액</td><td>1회</td></tr>
+<tr class="warn"><td><b>혼합(과세+면세)</b><br>→ 분리 발행 권장</td><td>과세분: 과세<br>면세분: 비과세</td><td>과세: 과세공급가액<br>면세: 면세금액</td><td>과세: 과세부가세<br>면세: 0</td><td>각 부분 결제액</td><td><b>2회</b></td></tr>
+</tbody>
+</table>
+<h3>혼합주문 예시 — 과세 11,000원(공급가 10,000+부가세 1,000) + 면세 5,000원, 총 16,000원</h3>
+<table>
+<thead><tr><th>발행 건</th><th>taxationType</th><th>supplyCost</th><th>tax</th><th>totalAmount</th></tr></thead>
+<tbody>
+<tr><td>① 과세 현금영수증</td><td>과세</td><td>10,000</td><td>1,000</td><td>11,000</td></tr>
+<tr><td>② 면세 현금영수증</td><td>비과세</td><td>5,000</td><td>0</td><td>5,000</td></tr>
+</tbody>
+</table>
+<div class="note">식별정보(휴대폰번호 등)는 두 건 모두 동일하게 사용. 기업 월합산도 동일 원리로 <b>세금계산서(과세) + 계산서(면세)</b> 두 건으로 분리 발행.</div>
+
+<h2>5. 우리가 구현해야 할 발행 (요약)</h2>
+<ul>
+<li><b>현금영수증 발행</b> — 개인(선불) + [충전잔액 · 가상계좌 · 전용계좌] (과세=과세, 면세=비과세)</li>
+<li><b>세금계산서 발행</b> — 기업(선불) 과세분 + [충전잔액 · 가상계좌 · 전용계좌], 기업(후불) 월정산 과세분</li>
+<li><b>계산서(면세) 발행</b> — 기업(선불/후불) 면세분 (세금계산서와 별도 건)</li>
+<li><b>구현 제외(결제사 발행)</b> — 신용카드 · 휴대폰결제 · 네이버/카카오페이</li>
+</ul>
+
+<h2>6. 구현 체크리스트</h2>
+<ul>
+<li>회원·결제 마스터: 개인/기업선불/기업후불, 기업 사업자번호 진위확인, 후불 여신·미수금</li>
+<li>상품 마스터: <b>과세 / 면세 / 쿠폰(상품권성)</b> 구분 플래그 — 모든 발행 로직의 출발점</li>
+<li>선수금(충전) 원장: 충전=선수금 무발행, 사용=차감, 충전 카드전표는 매출 배제</li>
+<li>증빙 결정 룰엔진: (상품유형 × 회원 × 결제수단) → (증빙종류 · 발행주체 · 시점) 판정, 위 매트릭스 데이터화</li>
+<li>혼합주문 금액분리: 과세공급가액/과세부가세/면세금액 분리 집계</li>
+<li>발행 연동: 현금영수증·세금계산서·계산서 (PG 또는 ASP[팝빌 등] — 세금계산서/계산서까지면 ASP 통합 권장)</li>
+<li>발행 상태관리: 대기/완료/실패 + 승인번호 저장 + 실패 재시도, 기명발급 기본값</li>
+<li>이중발급 차단: 카드/간편결제 건은 우리 발행 대상에서 자동 제외 플래그</li>
+<li>취소·부분취소: (-)수정세금계산서/계산서, 현금영수증 취소, 선수금 복원 (과세·면세 각각)</li>
+<li>거래명세서: 주문내역 발급 유지 + "세무증빙 아님" 표기, 발행 증빙번호 병행 노출</li>
+<li>결제사 발행 수단(카드·휴대폰·간편결제)의 <b>발급 주체·방식 연동 스펙 확인</b></li>
+<li>매출 ↔ 증빙 발급 대사 리포트(누락·중복 탐지)</li>
+</ul>
+
+<h2>7. 세무 확정 필요 (개발 착수 전)</h2>
+<ul>
+<li>쿠폰의 세법상 성격 (상품권성 vs 물품·용역형) 및 회사 역할 (직접판매 vs 중개)</li>
+<li>기업 즉시 카드결제 시 세금계산서 발급 허용 여부 (원칙적으로 카드결제분은 세금계산서 발급 제한)</li>
+<li>현금영수증/세금계산서 의무발행업종 해당 여부 (2026년 의무발행업종 확대)</li>
+<li>혼합주문 현금영수증 분리발행 vs 단일발행 처리 방침</li>
+</ul>
+
+<div class="disc">
+⚠️ 본 문서는 실무 설계 참고용 정리이며 세무 자문이 아닙니다. 실제 발행 정책·부가세 신고 처리는 시스템 확정 전 <b>세무사 또는 관할 세무서 검토</b>를 반드시 받으시기 바랍니다.<br>
+참고: 국세청 현금영수증/전자(세금)계산서 안내, 부가가치세법 제33조·제46조, 팝빌 현금영수증·전자세금계산서 API 문서.
+</div>
+
+</body>
+</html>
