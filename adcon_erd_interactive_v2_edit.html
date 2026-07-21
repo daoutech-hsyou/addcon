@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>애드콘 쿠폰판매 서비스 - 테이블 관계도</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: "Segoe UI", "Malgun Gothic", sans-serif; background: #0f1420; color: #e6e9ef; }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+  header { padding: 10px 16px; background: #161c2c; border-bottom: 1px solid #26304a; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header .sub { font-size: 12px; color: #8b95ab; }
+  .controls { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .controls input { background: #0f1420; border: 1px solid #33405f; color: #e6e9ef; padding: 6px 10px; border-radius: 6px; font-size: 13px; width: 200px; }
+  .controls button { background: #26304a; border: 1px solid #33405f; color: #e6e9ef; padding: 6px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  .controls button:hover { background: #33405f; }
+  #stage { flex: 1; position: relative; overflow: hidden; cursor: grab; }
+  #stage.grabbing { cursor: grabbing; }
+  svg { width: 100%; height: 100%; display: block; }
+  .edge { stroke: #3b466380; stroke-width: 1; fill: none; }
+  .edge.hl { stroke: #ffb454; stroke-width: 2; }
+  .edge.dim { opacity: 0.06; }
+  .node rect { rx: 6; ry: 6; stroke-width: 1.5; }
+  .node text { font-size: 11px; fill: #eef1f6; pointer-events: none; }
+  .node text.key { font-size: 9px; fill: #aab4cc; }
+  .node.dim { opacity: 0.12; }
+  .node.hub rect { stroke-width: 2.5; }
+  .node { cursor: pointer; }
+  .legend { position: absolute; left: 12px; bottom: 12px; background: #161c2ccc; border: 1px solid #26304a; border-radius: 8px; padding: 10px 12px; font-size: 12px; max-width: 230px; }
+  .legend .row { display: flex; align-items: center; gap: 8px; margin: 3px 0; cursor: pointer; }
+  .legend .row:hover { color: #fff; }
+  .legend .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .panel { position: absolute; right: 12px; top: 12px; width: 320px; max-height: calc(100vh - 90px); overflow-y: auto; background: #161c2cf2; border: 1px solid #26304a; border-radius: 8px; padding: 12px 14px; font-size: 12px; display: none; }
+  .panel h3 { margin: 0 0 6px; font-size: 14px; }
+  .panel .tag { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px; margin-bottom: 8px; }
+  .panel ul { margin: 6px 0 0; padding-left: 16px; color: #b9c2d8; }
+  .panel .hint { color: #7b8399; font-size: 11px; margin-top: 8px; }
+  .panel .sect { margin-top: 10px; font-weight: 700; color: #cfd6e6; border-top: 1px solid #26304a; padding-top: 8px; }
+  .cols { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  .cols td { padding: 2px 4px; vertical-align: top; border-bottom: 1px solid #212a40; }
+  .cols .cn { color: #eef1f6; font-weight: 600; white-space: nowrap; }
+  .cols .ct { color: #7fd3a8; font-family: Consolas, monospace; font-size: 10px; white-space: nowrap; }
+  .cols .cc { color: #97a1b8; font-size: 10px; }
+  .badge { display: inline-block; font-size: 8px; font-weight: 700; padding: 0 4px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
+  .badge.pk { background: #ffb45433; color: #ffb454; }
+  .badge.uk { background: #4f8cff33; color: #4f8cff; }
+  .badge.fk { background: #c17aff33; color: #c17aff; }
+  #editToggle.on { background: #2e7d5b; border-color: #37c98b; }
+  .toolbar { display: none; width: 100%; margin-top: 8px; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .toolbar button { background: #26304a; border: 1px solid #33405f; color: #e6e9ef; padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .toolbar button:hover { background: #33405f; }
+  .tbsep { width: 1px; height: 18px; background: #33405f; margin: 0 4px; }
+  .tbnote { font-size: 11px; color: #7b8399; margin-left: auto; }
+  body.editing #stage { outline: 2px solid #37c98b55; outline-offset: -2px; }
+  .fl { display:block; font-size: 10px; color: #8b95ab; margin: 8px 0 2px; }
+  .fi { width: 100%; background: #0f1420; border: 1px solid #33405f; color: #e6e9ef; padding: 5px 7px; border-radius: 5px; font-size: 12px; }
+  .mini { background: #26304a; border: 1px solid #33405f; color: #e6e9ef; padding: 2px 8px; border-radius: 5px; font-size: 11px; cursor: pointer; }
+  .mini:hover { background: #33405f; }
+  .mini.primary { background: #2e7d5b; border-color: #37c98b; }
+  .mini.danger { background: #5a2530; border-color: #a3455a; }
+  .crow, .rrow { display: flex; gap: 3px; margin-bottom: 3px; align-items: center; }
+  .ci { background: #0f1420; border: 1px solid #2b3550; color: #e6e9ef; padding: 3px 5px; border-radius: 4px; font-size: 11px; min-width: 0; }
+  .cn2 { flex: 1.1; } .ct2 { flex: 1; } .cc2 { flex: 1.3; } .cf2 { flex: 0 0 62px; } .rt2 { flex: 1; }
+  .footnote { position: absolute; left: 12px; top: 12px; font-size: 11px; color: #66708a; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <h1>애드콘(ADCON) 쿠폰판매 서비스 · 테이블 관계도</h1>
+      <div class="sub">DB: 3n1_db (donut) · 총 110개 테이블 · 관계는 컬럼명 규칙 기반 추론(명시적 FK 없음)</div>
+    </div>
+    <div class="controls">
+      <input id="search" type="text" placeholder="테이블명 검색 (예: bill, point)">
+      <button id="reset">전체보기</button>
+      <button id="zin">+</button>
+      <button id="zout">−</button>
+      <button id="editToggle">✏ 편집 모드</button>
+    </div>
+    <div class="toolbar" id="toolbar">
+      <button id="tbAdd">＋ 테이블 추가</button>
+      <span class="tbsep"></span>
+      <button id="tbSaveJson">💾 JSON 저장</button>
+      <button id="tbLoadJson">📂 JSON 불러오기</button>
+      <span class="tbsep"></span>
+      <button id="tbSql">⬇ SQL 내보내기</button>
+      <button id="tbDbml">⬇ DBML 내보내기</button>
+      <span class="tbnote">편집 후 JSON을 저장해 Git 등으로 팀과 공유하세요</span>
+    </div>
+  </header>
+  <div id="stage">
+    <svg id="svg">
+      <g id="viewport">
+        <g id="edges"></g>
+        <g id="nodes"></g>
+      </g>
+    </svg>
+    <div class="footnote">마우스 드래그: 이동 · 휠: 확대/축소 · 노드 클릭: 관계 강조</div>
+    <div class="legend" id="legend"></div>
+    <div class="panel" id="panel"></div>
+  </div>
+</div>
+<script>
+// ---------- 도메인 정의 ----------
+const DOMAINS = {
+  user:    { name: "회원/인증",        color: "#4f8cff" },
+  goods:   { name: "상품/브랜드",      color: "#37c98b" },
+  order:   { name: "주문/결제",        color: "#ff7a7a" },
+  money:   { name: "적립금/포인트",    color: "#ffb454" },
+  send:    { name: "발송(쿠폰/메시지)", color: "#c17aff" },
+  content: { name: "컨텐츠/기획전",    color: "#00c2d1" },
+  event:   { name: "이벤트/룰렛",      color: "#e86ab0" },
+  cs:      { name: "상담/Q&A/게시판",  color: "#8ab0d0" },
+  admin:   { name: "관리자/보안",      color: "#9aa0aa" },
+  stat:    { name: "통계/기타",        color: "#6b7488" },
+};
+
+// ---------- 테이블 정의 ----------
+// [id, domain, key설명, hub여부]
+const T = [
+  // user
+  ["donut_user","user","회원 (허브)",true],["donut_internal_user","user","사내계정"],
+  ["oauth_user","user","간편로그인"],["donut_auto_login","user","자동로그인"],
+  ["kmc_auth_history","user","KMC인증"],["donut_daoupay_auth","user","키움페이인증"],
+  ["donut_company","user","비즈기업정보"],["biz_user_request","user","비즈신청"],
+  ["donut_user_option","user","회원옵션"],["donut_user_option_history","user","옵션이력"],
+  ["donut_user_quit","user","탈퇴"],["donut_user_sleep","user","휴면"],
+  ["donut_user_sleep_target","user","휴면대상"],["donut_user_sleep_delete","user","휴면삭제"],
+  ["donut_user_join_ip","user","가입IP제한"],["donut_agree_mail_history","user","수신동의메일"],
+  ["grade_adjust","user","등급조정"],["donut_monthly_stat","user","월별스냅샷"],
+  // goods
+  ["donut_category","goods","카테고리"],["donut_brand","goods","브랜드"],
+  ["donut_goods","goods","상품 (허브)",true],["delivery_goods_option","goods","배송옵션"],
+  ["goods_display_reason","goods","전시사유"],["purchase_goods_limit","goods","상품구매제한"],
+  ["purchase_limit","goods","브랜드구매제한"],["donut_sales_stat","goods","판매통계"],
+  ["donut_static_goods","goods","일별판매통계"],
+  // order/bill
+  ["donut_cart","order","장바구니"],["donut_bill","order","결제 (허브)",true],
+  ["donut_bill_pg","order","PG결제"],["donut_order","order","주문 (허브)",true],
+  ["bill_private_account","order","전용계좌"],["bill_private_account_history","order","전용계좌내역"],
+  ["giftcard_auth_log","order","상품권인증"],
+  // money
+  ["donut_deposit","money","적립금"],["donut_deposit_history","money","적립금내역"],
+  ["bill_saving_history","money","구매적립"],["donut_point","money","도넛포인트"],
+  ["donut_point_history","money","포인트내역"],["donut_point_use","money","포인트사용"],
+  ["donut_static_point_status","money","포인트통계"],["npay_point_convert_history","money","네이버페이전환"],
+  ["npay_point_convert_option","money","전환옵션"],
+  // send
+  ["donut_msg","send","쿠폰발송내역"],["send_msg_history","send","발송히스토리"],
+  ["donut_reserve_msg","send","발송예약"],["donut_send_approval","send","발송승인"],
+  ["donut_msg_storage","send","문자보관함"],["donut_mms_templet","send","MMS템플릿"],
+  ["donut_svc_templet","send","추천템플릿"],["donut_sendphone","send","발신번호인증"],
+  ["donut_sendphone_history","send","발신번호이력"],["sendphone_file","send","인증파일"],
+  ["donut_daoupay_bill","send","DAOUPAY결제"],["donut_daoupay_msg","send","DAOUPAY발송"],
+  ["pick_order","send","쿠팝콕주문"],["pick_msg","send","쿠팝콕발송"],
+  ["uds_log","send","발송로그"],["uds_log_202512","send","로그202512"],
+  ["uds_log_202601","send","로그202601"],["uds_log_202602","send","로그202602"],
+  ["uds_log_202603","send","로그202603"],["uds_log_202604","send","로그202604"],
+  ["uds_log_202605","send","로그202605"],
+  // content
+  ["donut_content","content","컨텐츠 (허브)",true],["donut_promotion_goods","content","기획전상품"],
+  ["theme_goods","content","테마상품"],["donut_event_goods","content","상품이벤트"],
+  ["donut_event_apply","content","이벤트신청"],
+  // event
+  ["event_recommend","event","친구추천"],["event_recommend_apply","event","추천신청"],
+  ["event_payback_first_order","event","첫구매이벤트"],["event_payback_apply","event","페이백지급"],
+  ["donut_event_biz","event","비즈이벤트"],["donut_event_biz_apply","event","비즈참여"],
+  ["donut_event_biz_banner","event","비즈배너"],["donut_event_biz_goods","event","비즈상품"],
+  ["external_event","event","외부이벤트"],["external_event_apply","event","외부참여"],
+  ["external_event_goods","event","외부상품"],["external_event_survey","event","외부설문"],
+  ["donut_roulette","event","룰렛"],["donut_roulette_goods","event","룰렛상품"],
+  ["donut_roulette_apply","event","룰렛참여"],["donut_roulette_progress","event","룰렛진행"],
+  ["expired_coupon_income","event","낙전수익"],
+  // cs
+  ["donut_addr_group","cs","주소록그룹"],["donut_addr_list","cs","주소록"],
+  ["donut_counsel","cs","대량발송상담"],["donut_counsel_bulk","cs","대량구매상담"],
+  ["donut_qna","cs","Q&A"],["guest_qna","cs","비회원Q&A"],["donut_bbs","cs","공지/FAQ"],
+  // admin
+  ["donut_admin","admin","관리자 (허브)",true],["donut_admin_option","admin","관리자옵션"],
+  ["donut_admin_work_history","admin","작업이력"],["service_option","admin","서비스옵션"],
+  ["ip_blacklist","admin","IP차단"],["ip_whitelist","admin","예외IP"],["ip_whitelist_history","admin","예외IP이력"],
+  // stat
+  ["sleep_statt","stat","별도보관구문"],["sleep_usert","stat","휴면대상자"],
+  ["donut_static_sales","stat","판매통계"],["donut_static_sales_status","stat","판매현황"],
+  ["donut_static_send_sales_status","stat","발송판매현황"],["STATIC_TRADE_SALES","stat","거래액통계"],
+  ["DONUT_CRM_TRACKING","stat","CRM트래킹"],
+];
+
+// ---------- 관계 정의 [child, parent, label] ----------
+const R = [
+  // user hub
+  ["oauth_user","donut_user"],["kmc_auth_history","donut_user"],["donut_daoupay_auth","donut_user"],
+  ["donut_company","donut_user"],["biz_user_request","donut_user"],["donut_user_option","donut_user"],
+  ["donut_user_option_history","donut_user"],["donut_user_quit","donut_user"],["donut_user_sleep","donut_user"],
+  ["donut_user_sleep_target","donut_user"],["grade_adjust","donut_user"],["donut_monthly_stat","donut_user"],
+  ["donut_cart","donut_user"],["donut_bill","donut_user"],["donut_bill_pg","donut_user"],
+  ["donut_order","donut_user"],["bill_private_account","donut_user"],["bill_private_account_history","donut_user"],
+  ["giftcard_auth_log","donut_user"],["donut_deposit","donut_user"],["donut_deposit_history","donut_user"],
+  ["bill_saving_history","donut_user"],["donut_point","donut_user"],["donut_point_history","donut_user"],
+  ["donut_point_use","donut_user"],["npay_point_convert_history","donut_user"],["donut_msg","donut_user"],
+  ["donut_send_approval","donut_user"],["donut_msg_storage","donut_user"],["donut_mms_templet","donut_user"],
+  ["donut_sendphone","donut_user"],["donut_sendphone_history","donut_user"],["donut_daoupay_bill","donut_user"],
+  ["pick_order","donut_user"],["donut_addr_group","donut_user"],["donut_addr_list","donut_user"],
+  ["donut_counsel_bulk","donut_user"],["donut_qna","donut_user"],["donut_event_apply","donut_user"],
+  ["donut_event_biz_apply","donut_user"],["donut_roulette_apply","donut_user"],["external_event_apply","donut_user"],
+  ["event_payback_first_order","donut_user"],["event_payback_apply","donut_user"],
+  ["event_recommend_apply","donut_user","추천/피추천"],
+  // goods hub
+  ["donut_brand","donut_category"],["donut_goods","donut_brand"],["purchase_limit","donut_brand"],
+  ["delivery_goods_option","donut_goods"],["goods_display_reason","donut_goods"],["purchase_goods_limit","donut_goods"],
+  ["donut_sales_stat","donut_goods"],["donut_static_goods","donut_goods"],["donut_cart","donut_goods"],
+  ["donut_order","donut_goods"],["donut_msg","donut_goods"],["donut_promotion_goods","donut_goods"],
+  ["theme_goods","donut_goods"],["donut_event_goods","donut_goods","b2c/b2b"],["donut_event_biz_goods","donut_goods"],
+  ["external_event_apply","donut_goods"],["external_event_goods","donut_goods"],["donut_daoupay_bill","donut_goods","first_goods"],
+  ["donut_roulette_goods","donut_goods","b2b/b2c"],["pick_order","donut_goods","1/2/3rd"],["pick_msg","donut_goods","choice"],
+  // bill hub
+  ["donut_bill_pg","donut_bill"],["donut_order","donut_bill"],["bill_private_account","donut_bill"],
+  ["bill_private_account_history","donut_bill"],["bill_saving_history","donut_bill"],["giftcard_auth_log","donut_bill"],
+  ["donut_deposit_history","donut_bill"],["donut_point_history","donut_bill"],["donut_point_use","donut_bill"],
+  ["donut_reserve_msg","donut_bill"],["donut_send_approval","donut_bill"],["donut_daoupay_bill","donut_bill"],
+  ["pick_order","donut_bill"],["donut_event_apply","donut_bill"],["event_recommend_apply","donut_bill"],
+  ["event_payback_first_order","donut_bill"],["external_event_apply","donut_bill"],
+  // order
+  ["donut_msg","donut_order"],["donut_reserve_msg","donut_order"],
+  // money
+  ["donut_deposit_history","donut_deposit"],["donut_point_history","donut_point"],["donut_point_use","donut_point_history"],
+  // send
+  ["send_msg_history","donut_msg"],["donut_daoupay_msg","donut_daoupay_bill"],["pick_msg","pick_order"],
+  ["donut_sendphone_history","donut_sendphone"],["sendphone_file","donut_sendphone"],
+  ["bill_private_account_history","bill_private_account"],
+  // content
+  ["donut_promotion_goods","donut_content"],["theme_goods","donut_content"],["donut_event_goods","donut_content"],
+  ["donut_event_apply","donut_content"],["donut_daoupay_bill","donut_content"],["event_recommend","donut_content"],
+  ["event_recommend_apply","donut_content"],
+  // event
+  ["event_payback_apply","event_payback_first_order"],["donut_event_biz_apply","donut_event_biz"],
+  ["donut_event_biz_banner","donut_event_biz"],["donut_event_biz_goods","donut_event_biz"],
+  ["external_event_apply","external_event"],["external_event_goods","external_event"],
+  ["external_event_survey","external_event_apply"],["donut_roulette_goods","donut_roulette"],
+  ["donut_roulette_apply","donut_roulette"],["donut_roulette_apply","donut_roulette_goods"],
+  ["donut_roulette_progress","donut_roulette_goods"],
+  // cs
+  ["donut_addr_list","donut_addr_group"],
+  // admin
+  ["donut_admin_option","donut_admin"],["donut_qna","donut_admin"],["guest_qna","donut_admin"],
+  ["donut_bbs","donut_admin"],["donut_send_approval","donut_admin"],["donut_counsel_bulk","donut_admin"],
+  ["donut_deposit_history","donut_admin"],["donut_point_history","donut_admin"],
+  ["ip_whitelist_history","ip_whitelist"],
+];
+
+// ---------- 레이아웃 & 렌더 (재렌더 가능) ----------
+const NW = 150, NH = 34, GAP_Y = 46, COL_W = 330, PAD = 40;
+const domainOrder = Object.keys(DOMAINS);
+const svg = document.getElementById("svg");
+const gEdges = document.getElementById("edges");
+const gNodes = document.getElementById("nodes");
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+
+let byDomain = {}, nodeMap = {}, edgeEls = [], adj = {}, nodeEls = {};
+
+function computeLayout() {
+  byDomain = {}; domainOrder.forEach(d => byDomain[d] = []);
+  nodeMap = {};
+  T.forEach(t => {
+    const [id, domain, key, hub] = t;
+    const n = { id, domain: byDomain[domain] ? domain : "stat", key, hub: !!hub };
+    nodeMap[id] = n; byDomain[n.domain].push(n);
+  });
+  const gridCols = 5;
+  const innerColsOf = list => list.length > 12 ? 2 : 1;
+  const rowsOf = list => Math.ceil(list.length / innerColsOf(list));
+  const numGridRows = Math.ceil(domainOrder.length / gridCols);
+  const gridRowY = []; let acc = 0;
+  for (let gr = 0; gr < numGridRows; gr++) {
+    let maxRows = 0;
+    domainOrder.forEach((d, i) => { if (Math.floor(i / gridCols) === gr) maxRows = Math.max(maxRows, rowsOf(byDomain[d])); });
+    gridRowY[gr] = acc; acc += maxRows * GAP_Y + 90;
+  }
+  domainOrder.forEach((d, di) => {
+    const gx = di % gridCols, gy = Math.floor(di / gridCols);
+    const list = byDomain[d]; const colBaseX = gx * COL_W + PAD;
+    const innerCols = innerColsOf(list); const baseY = gridRowY[gy];
+    list.forEach((n, i) => {
+      const ic = i % innerCols, ir = Math.floor(i / innerCols);
+      n.x = colBaseX + ic * (NW + 12); n.y = baseY + 60 + ir * GAP_Y;
+    });
+    byDomain[d]._label = { x: colBaseX, y: baseY + 30, name: DOMAINS[d].name };
+  });
+}
+
+function renderAll() {
+  computeLayout();
+  gNodes.innerHTML = ""; gEdges.innerHTML = "";
+  domainOrder.forEach(d => {
+    if (!byDomain[d].length) return;
+    const lb = byDomain[d]._label;
+    const t = el("text", { x: lb.x, y: lb.y, "font-size": 14, "font-weight": "700", fill: DOMAINS[d].color });
+    t.textContent = "● " + lb.name; gNodes.appendChild(t);
+  });
+  edgeEls = []; adj = {};
+  R.forEach(r => {
+    const [c, p] = r; const cn = nodeMap[c], pn = nodeMap[p];
+    if (!cn || !pn) return;
+    const x1 = cn.x + NW/2, y1 = cn.y, x2 = pn.x + NW/2, y2 = pn.y;
+    const mx = (x1 + x2) / 2;
+    const path = el("path", { d: `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`, class: "edge" });
+    path.dataset.c = c; path.dataset.p = p;
+    gEdges.appendChild(path); edgeEls.push(path);
+    (adj[c] = adj[c] || []).push(p); (adj[p] = adj[p] || []).push(c);
+  });
+  nodeEls = {};
+  Object.values(nodeMap).forEach(n => {
+    const g = el("g", { class: "node" + (n.hub ? " hub" : ""), transform: `translate(${n.x},${n.y - NH/2})` });
+    const rect = el("rect", { width: NW, height: NH, fill: "#1b2336", stroke: DOMAINS[n.domain].color });
+    const t1 = el("text", { x: 8, y: 14 }); t1.textContent = n.id.length > 22 ? n.id.slice(0,21)+"…" : n.id;
+    const t2 = el("text", { x: 8, y: 27, class: "key" }); t2.textContent = n.key;
+    g.appendChild(rect); g.appendChild(t1); g.appendChild(t2);
+    g.addEventListener("click", (e) => { e.stopPropagation(); selectNode(n.id); });
+    g.addEventListener("mouseenter", () => hoverNode(n.id, true));
+    g.addEventListener("mouseleave", () => { if (!selected) clearHL(); });
+    gNodes.appendChild(g); nodeEls[n.id] = g;
+  });
+  buildLegend();
+}
+
+// ---------- 컬럼 정의 [name, type, comment, flag(PK/UK/FK)] ----------
+const COLS = {
+  bill_private_account: [["pa_no","int","일련번호","PK"],["bank_code","varchar(2)","은행코드"],["account_no","varchar(20)","계좌번호","UK"],["user_no","int","할당된 회원번호","FK"],["bill_no","int","할당된 주문번호","FK"],["issue_status","char(2)","상태코드"],["issue_dt","datetime","발급일시"],["reg_dt","datetime","등록일시"],["expire_dt","datetime","만료일시"],["update_dt","datetime","수정일시"]],
+  bill_private_account_history: [["history_no","int","일련번호","PK"],["pa_no","int","전용계좌 번호","FK"],["action_type","varchar(20)","수행타입"],["prev_status","char(2)","변경 전 상태"],["curr_status","char(2)","변경 후 상태"],["user_no","int","회원번호","FK"],["bill_no","int","주문번호","FK"],["reg_dt","datetime","등록일"]],
+  bill_saving_history: [["history_no","int","일련번호","PK"],["bill_no","int","결제번호","FK"],["user_no","int","회원번호","FK"],["saving_rate","decimal(5,2)","적립률"],["saving_amt","int","적립금액"],["cancel_amt","int","취소금액"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"]],
+  biz_user_request: [["request_no","int","일련번호","PK"],["request_type","char(1)","신청유형"],["approve_status","char(1)","승인상태"],["user_no","int","회원번호","FK"],["user_name","varchar(67)","회원명"],["mobile","varchar(67)","휴대폰번호"],["comp_name","varchar(45)","상호명"],["comp_no","varchar(35)","사업자등록번호"],["ceo_name","varchar(12)","대표자명"],["zip_code","varchar(12)","우편번호"],["comp_addr1","varchar(100)","사업장 주소"],["comp_addr2","varchar(100)","상세주소"],["comp_phone","varchar(35)","회사 번호"],["business_type","varchar(2)","업종"],["emp_file","varchar(45)","재직증명서"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"],["process_dt","datetime","처리일시"]],
+  delivery_goods_option: [["option_no","int","일련번호","PK"],["goods_no","int","상품 번호","FK"],["goods_limit_cnt","int","전체 구매 제한"],["account_limit_cnt","int","계정 구매 제한"],["sale_cnt","int","판매 개수"]],
+  donut_addr_group: [["group_no","int","일련번호","PK"],["user_no","int","회원 번호","FK"],["group_name","varchar(32)","그룹명"],["group_cnt","int","그룹내 건수"],["update_dt","timestamp","수정일"],["reg_dt","datetime","등록일"]],
+  donut_addr_list: [["list_no","int","일련번호","PK"],["user_no","int","회원번호","FK"],["group_no","int","그룹번호","FK"],["user_name","varchar(67)","이름"],["mobile","varchar(35)","휴대폰번호"],["memo","varchar(45)","메모"],["var1","varchar(20)","치환변수1"],["var2","varchar(20)","치환변수2"],["var3","varchar(20)","치환변수3"],["update_dt","timestamp","수정일"],["reg_dt","datetime","등록일"]],
+  donut_admin: [["admin_no","int uns","관리자 번호","PK"],["admin_id","varchar(16)","아이디"],["admin_pwd","varchar(64)","비밀번호"],["admin_auth","varchar(32)","관리자 권한"],["admin_name","varchar(67)","관리자 이름"],["mobile","varchar(35)","휴대폰번호"],["email","varchar(131)","이메일"],["sms_alarm_yn","char(1)","문자 알람"],["email_alarm_yn","char(1)","이메일 알람"],["admin_status","char(2)","상태"],["fail_cnt","int","로그인 실패"],["otp_key","char(16)","OTP Key"],["secure_ip","varchar(80)","접근제어 IP"],["pwd_dt","datetime","비밀번호 변경일"],["login_dt","datetime","로그인 일시"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"],["temp_pwd_yn","char(1)","임시 비밀번호"]],
+  donut_admin_option: [["option_no","int uns","옵션 번호","PK"],["admin_no","int","관리자번호","FK"],["option_cd","char(3)","옵션코드"],["option_value","varchar(32)","옵션 값"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"]],
+  donut_admin_work_history: [["work_no","int","작업 번호","PK"],["work_code","char(2)","작업 코드"],["work_key","varchar(30)","작업키"],["admin_id","varchar(16)","관리자아이디"],["history","varchar(200)","작업이력"],["memo","varchar(200)","메모"],["reg_dt","datetime","등록 일시"]],
+  donut_agree_mail_history: [["history_no","int","일련번호","PK"],["user_no","int","회원번호"],["send_dt","datetime","발송일시"]],
+  donut_auto_login: [["series","varchar(64)","시리즈","PK"],["username","varchar(50)","아이디"],["token","varchar(64)","토큰"],["last_used","timestamp","최근사용"]],
+  donut_bbs: [["bbs_no","int","일련번호","PK"],["bbs_type","char(1)","게시판 유형"],["content_type","char(2)","컨텐츠 유형"],["title","varchar(100)","제목"],["content","text","내용"],["display_yn","char(1)","노출여부"],["update_dt","timestamp","수정일"],["reg_dt","datetime","등록일"],["admin_no","int","등록 어드민","FK"],["hits","int","조회수"]],
+  donut_bill: [["bill_no","int","결제번호","PK"],["user_no","int","회원번호","FK"],["bill_status","char(2)","결제 상태"],["pay_method","char(1)","결제 방식"],["bill_type","char(2)","결제 종류"],["total_amt","int","총 결제 금액"],["bill_amt","int","실 결제 금액"],["use_deposit_amt","int","적립금 사용"],["use_point_amt","int","포인트 사용"],["refund_deposit_amt","int","환불 적립금"],["refund_point_amt","int uns","환불 포인트"],["update_dt","timestamp","수정일"],["reg_dt","datetime","등록일"],["bill_dt","datetime","실결제일"],["cancel_dt","datetime","취소일"],["channel","char(2)","채널"],["reserve_status","char(1)","예약상태"],["reserve_time","datetime","예약시간"],["bill_yn","char(1)","처리완료 여부"],["send_msg_type","char(1)","발송메시지타입"],["send_name","varchar(32)","발신자명"]],
+  donut_bill_pg: [["pg_no","int","일련번호","PK"],["bill_no","int","결제번호","FK"],["user_no","int","회원번호","FK"],["ordr_idxx","varchar(64)","PG 주문번호"],["tno","varchar(32)","PG 거래번호"],["pg_type","char(1)","PG유형"],["card_name","varchar(20)","결제 카드명"],["bank_name","varchar(20)","은행명"],["va_bankname","varchar(20)","가상계좌 은행명"],["va_account","varchar(20)","가상계좌 계좌번호"],["va_date","varchar(14)","가상계좌 마감일"],["na_username","varchar(67)","무통장 입금자명"],["cancel_yn","char(1)","취소 여부"],["cancel_dt","datetime","취소 일자"],["reg_dt","datetime","등록일"]],
+  donut_brand: [["brand_no","int","브랜드 번호","PK"],["category_no","int","카테고리 번호","FK"],["brand_name","varchar(64)","브랜드명"],["brand_logo","varchar(64)","브랜드 로고"],["brand_info_image","varchar(64)","설명 이미지"],["brand_hash_tag","varchar(500)","해시태그"],["brand_use_place_info","text","사용매장안내"],["brand_use_guide","text","유의사항"],["display_order","int","노출 순서"],["brand_display_yn","char(1)","노출 여부"],["update_dt","timestamp","수정일"],["reg_dt","datetime","등록일"]],
+  donut_cart: [["cart_no","int","일련번호","PK"],["user_no","int","회원번호","FK"],["goods_no","int","상품 번호","FK"],["reg_dt","datetime","등록 일자"]],
+  donut_category: [["category_no","int","카테고리 번호","PK"],["category_name","varchar(64)","카테고리명"],["category_image","varchar(64)","이미지"],["category_image_over","varchar(64)","이미지(over)"],["mobile_category_image","varchar(64)","모바일 이미지"],["display_order","int","노출 순서"],["category_display_yn","char(1)","노출 여부"],["update_dt","timestamp","수정일"],["reg_dt","datetime","등록일"]],
+  donut_company: [["company_no","int","일련번호","PK"],["user_no","int","회원 번호","FK"],["comp_type","char(2)","사업자 유형"],["comp_name","varchar(45)","상호명"],["comp_no","varchar(35)","사업자등록번호"],["comp_file","varchar(45)","사업자등록증"],["ceo_name","varchar(12)","대표자명"],["zip_code","varchar(12)","우편번호"],["comp_addr1","varchar(100)","사업장 주소"],["business_form","varchar(32)","업태"],["business_type","char(2)","업종"],["business_item","varchar(32)","종목"],["comp_phone","varchar(35)","전화번호"],["update_dt","timestamp","수정일"],["reg_dt","datetime","등록일"],["grade","char(2)","회원 등급"],["comp_addr2","varchar(100)","상세주소"],["change_yn","char(1)","전환가입 여부"],["emp_file","varchar(45)","재직증명서"]],
+  donut_content: [["content_no","int","컨텐츠번호","PK"],["content_type","char(1)","컨텐츠유형"],["banner_file","varchar(64)","배너 파일"],["banner_text","text","배너 텍스트"],["banner_type","char(2)","배너 유형"],["banner_link_type","char(1)","링크 유형"],["banner_order","int","노출 순서"],["comment","varchar(100)","설명"],["content","text","내용"],["content_mobile","text","내용(모바일)"],["display_yn","char(1)","노출 여부"],["display_start","char(8)","노출 시작일"],["display_end","char(8)","노출 종료일"],["event_type","char(1)","이벤트 종류"],["reg_dt","datetime","등록 일자"],["md_recommend_file","varchar(64)","MD 추천 이미지"],["md_recommend_order","int","MD 추천 순서"]],
+  donut_counsel: [["counsel_no","int","일련번호","PK"],["user_name","varchar(67)","요청자"],["goods_name","varchar(100)","상품명"],["send_cnt","int","발송 수량"],["etc_comment","text","기타 요청사항"],["email","varchar(50)","이메일"],["mobile","varchar(16)","휴대폰번호"],["return_type","char(1)","답변 형태"],["reg_dt","datetime","등록 일자"],["mng_admin_no","varchar(100)","영업담당자"]],
+  donut_counsel_bulk: [["bulk_no","int","일련번호","PK"],["user_no","int","요청자 번호","FK"],["user_name","varchar(45)","요청자 이름"],["goods_name","varchar(100)","상품명"],["counsel_status","char(1)","상담처리상태"],["counsel_time","char(2)","상담가능시간"],["send_cnt","int","발송수량"],["etc_comment","varchar(400)","기타 요청사항"],["mobile","varchar(16)","휴대폰번호"],["reg_dt","datetime","등록 일자"],["admin_no","int","어드민번호","FK"]],
+  donut_daoupay_auth: [["auth_no","int","인증 번호","PK"],["tno","varchar(32)","거래번호"],["user_no","int","회원번호","FK"],["auth_type","char(1)","인증유형"],["channel","char(2)","접속채널"],["reg_dt","datetime","등록일시"]],
+  donut_daoupay_bill: [["daoupay_no","int","DAOUPAY 결제번호","PK"],["bill_no","int","결제번호","FK"],["user_no","int","회원번호","FK"],["first_goods_no","int","노출상품번호","FK"],["goods_no_list","varchar(100)","상품번호 리스트"],["order_name","varchar(80)","발송명"],["send_phone","varchar(35)","발신번호"],["msg_title","varchar(64)","메시지 제목"],["msg_content","varchar(500)","메시지 내용"],["templet_no","int","템플릿 번호"],["content_no","int","컨텐츠 번호","FK"],["reg_dt","datetime","등록일"],["templet_type","char(1)","템플릿 유형"]],
+  donut_daoupay_msg: [["history_no","int","일련번호","PK"],["daoupay_no","int","DAOUPAY 결제번호","FK"],["dest_phone","varchar(35)","수신번호"],["dest_name","varchar(67)","수신자명"],["reg_dt","datetime","등록일시"],["var1","varchar(20)","치환변수1"],["var2","varchar(20)","치환변수2"],["var3","varchar(20)","치환변수3"]],
+  donut_deposit: [["deposit_no","int","일련번호","PK"],["user_no","int","회원번호","UK"],["deposit_amt","int","적립금 잔액"],["update_dt","timestamp","수정일"],["reg_dt","datetime","등록일"]],
+  donut_deposit_history: [["history_no","int","일련번호","PK"],["deposit_no","int","적립금 번호","FK"],["user_no","int","회원번호","FK"],["inout_type","char(1)","적립/차감"],["deposit_type","char(1)","변동 타입"],["inout_amt","int","변동 금액"],["inout_msg","varchar(100)","변동 상세"],["reg_dt","datetime","등록일"],["bill_no","int","결제번호","FK"],["deposit_amt","int","적립금 잔액"],["admin_no","int uns","관리자 번호","FK"]],
+  donut_event_apply: [["apply_no","int","신청번호","PK"],["content_no","int","컨텐츠번호","FK"],["user_no","int","회원번호","FK"],["bill_no","int","결제번호","FK"],["buy_amt","int","구매금액"],["reward_amt","int","리워드 금액"],["mobile","varchar(35)","수신번호"],["apply_status","char(1)","신청상태"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"]],
+  donut_event_biz: [["event_no","int","이벤트 번호","PK"],["event_type","char(1)","이벤트 유형"],["event_status","char(1)","이벤트 상태"],["day_limit_amt","int","일 비용한도"],["reg_dt","datetime","등록 일시"],["update_dt","timestamp","수정 일시"]],
+  donut_event_biz_apply: [["apply_no","int","참여번호","PK"],["event_no","int","이벤트 번호","FK"],["user_no","int","회원번호","FK"],["point_amt","int","포인트금액"],["reg_dt","datetime","등록 일시"]],
+  donut_event_biz_banner: [["banner_no","int","배너 번호","PK"],["event_no","int","이벤트 번호","FK"],["banner_type","char(2)","배너 유형"],["banner_file","varchar(64)","배너 파일"],["reg_dt","datetime","등록 일시"],["update_dt","timestamp","수정 일시"]],
+  donut_event_biz_goods: [["event_goods_no","int","이벤트 상품 번호","PK"],["event_no","int","이벤트 번호","FK"],["goods_no","int","상품 번호","FK"],["goods_name","varchar(64)","상품명"],["goods_img","varchar(64)","상품 이미지"],["point_amt","int","지급도넛"],["reg_dt","datetime","등록 일시"],["update_dt","timestamp","수정 일시"]],
+  donut_event_goods: [["content_no","int","컨텐츠번호","PK"],["top_img","varchar(100)","상단 이미지"],["mobile_top_img","varchar(100)","모바일 상단"],["goods_bg_img","varchar(100)","상품배경"],["goods_img","varchar(100)","상품 이미지"],["bill_yn","char(1)","구매여부 제한"],["user_type","char(1)","회원유형 제한"],["b2c_goods_no","int","B2C 상품번호","FK"],["b2b_goods_no","int","B2B 상품번호","FK"],["reward_type","char(1)","리워드 유형"],["reward_amt","int","리워드 금액"],["user_limit_cnt","int","아이디당 최대"],["total_cnt","int","총 수량"],["sale_cnt","int","판매수량"],["use_guide","text","유의사항"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"]],
+  donut_goods: [["goods_no","int","상품번호","PK"],["goods_type","char(2)","상품 유형"],["goods_div","char(1)","상품 구분"],["goods_id","varchar(20)","CMS 캠페인번호"],["alimtalk_goods_id","varchar(20)","알림톡 캠페인"],["online_goods_id","varchar(20)","온라인핀 캠페인"],["brand_no","int","브랜드 번호","FK"],["goods_name","varchar(64)","상품명"],["goods_img","varchar(64)","상품이미지"],["goods_desc_img","varchar(64)","상품설명이미지"],["goods_price","int","상품 가격"],["sale_price","int","판매 가격"],["contents","text","상품 설명"],["valid_day","int","유효기간(일)"],["hash_tag","varchar(500)","해시태그"],["use_place_info","text","사용매장안내"],["use_guide","text","유의사항"],["goods_display_yn","char(1)","노출 여부"],["refund_yn","char(1)","환불 가능"],["display_start","char(10)","노출 시작일"],["display_end","char(10)","노출 종료일"],["limit_cnt","int","발송 제한 수량"],["except_profit_yn","char(1)","낙전 제외"],["update_dt","timestamp","수정일"],["reg_dt","datetime","등록일"],["biz_goods_yn","char(1)","비즈전용관 노출"],["biz_category","int uns","비즈전용 카테고리"],["point_goods_yn","char(1)","도넛충전소 노출"],["promotion_goods_yn","char(1)","기획전 상품"],["saving_yn","char(1)","적립 여부"],["goods_saving_percent","decimal(4,2)","적립퍼센트"],["calculation_type","char(1)","정산타입"]],
+  donut_internal_user: [["user_no","int","회원번호","PK"],["user_id","varchar(16)","회원 아이디"],["user_name","varchar(20)","이름"],["dept_name","varchar(45)","부서명"],["reg_dt","datetime","등록일자"]],
+  donut_mms_templet: [["templet_no","int","일련번호","PK"],["user_no","int","회원번호","FK"],["image_type","char(1)","이미지 유형"],["image_file","varchar(64)","이미지 파일"],["image_name","varchar(40)","이미지명"],["is_main","char(1)","메인 여부"],["reg_dt","datetime","등록 일자"],["approve_status","char(1)","승인 여부"],["approve_dt","datetime","승인일"],["return_comment","varchar(100)","반려 사유"]],
+  donut_msg: [["msg_no","int","일련번호","PK"],["order_no","int","주문번호","FK"],["user_no","int","회원번호","FK"],["goods_no","int","상품번호","FK"],["goods_id","varchar(20)","CMS 캠페인번호"],["send_msg_type","char(1)","발송타입"],["send_channel","char(1)","발송채널"],["send_name","varchar(32)","발신자명"],["send_phone","varchar(35)","발신번호"],["dest_phone","varchar(35)","수신번호"],["dest_name","varchar(67)","수신자명"],["msg_title","varchar(64)","메시지 제목"],["msg_content","varchar(500)","메시지 내용"],["request_time","datetime","요청 시간"],["send_time","datetime","발송 시간"],["report_time","datetime","결과 시간"],["result","char(4)","결과 코드"],["result_msg","varchar(64)","결과 메시지"],["coupon_no","varchar(32)","쿠폰번호"],["trnsid","varchar(32)","CMS 트랜잭션ID"],["use_time","datetime","사용 시간"],["use_store","varchar(45)","사용처"],["use_amt","int","쿠폰 사용 금액"],["valid_end","char(8)","유효기간 종료일"],["cancel_time","datetime","취소 일시"],["alimtalk_template_no","int","알림톡 템플릿"],["card_image_no","int","카드이미지 번호"],["message_id","varchar(200)","InfoBank 메시지ID"]],
+  donut_monthly_stat: [["stat_no","int","통계번호","PK"],["stat_month","char(6)","통계월"],["user_no","int","회원번호","FK"],["user_status","char(2)","회원상태"],["user_type","char(1)","회원 유형"],["grade","char(2)","회원등급"],["point_amt","int","포인트 잔액"],["deposit_amt","int","적립금 잔액"],["bill_amt","bigint","pg결제 금액"],["deposit_bill_amt","bigint","적립금 충전"],["in_point_amt","bigint","도넛지급금액"],["out_point_amt","bigint","도넛회수금액"]],
+  donut_msg_storage: [["storage_no","int","보관함번호","PK"],["user_no","int","회원번호","FK"],["msg_title","varchar(64)","메시지 제목"],["msg_content","varchar(500)","메시지 내용"],["msg_theme_no","int","메시지 테마 번호"],["msg_card_image_no","int","카드 이미지 번호"],["reg_dt","datetime","등록일시"]],
+  donut_order: [["order_no","int","주문번호","PK"],["user_no","int","회원번호","FK"],["bill_no","int","결제번호","FK"],["order_name","varchar(80)","발송명"],["goods_no","int","상품번호","FK"],["unit_amt","int","발송단가"],["order_amt","int","주문 금액"],["order_cnt","int","발송 건수"],["succ_cnt","int","성공 건수"],["fail_cnt","int","실패 건수"],["update_dt","timestamp","수정일"],["reg_dt","datetime","등록일"]],
+  donut_point: [["point_no","int","일련번호","PK"],["user_no","int","회원번호","UK"],["point_amt","int","도넛포인트 잔액"],["update_dt","timestamp","수정일"],["reg_dt","datetime","등록일"]],
+  donut_point_history: [["history_no","int","일련번호","PK"],["point_no","int","도넛포인트 번호","FK"],["user_no","int","회원번호","FK"],["inout_type","char(1)","적립/차감"],["point_type","char(2)","변동 타입"],["inout_amt","int","변동 금액"],["inout_msg","varchar(100)","변동 상세"],["use_amt","int","적립도넛 사용금액"],["reg_dt","datetime","등록일"],["use_dt","datetime","사용일자"],["expire_dt","datetime","만료일자"],["bill_no","int","결제번호","FK"],["point_amt","int","포인트 잔액"],["admin_no","int uns","관리자 번호","FK"]],
+  donut_point_use: [["use_no","int","일련번호","PK"],["history_no","int","포인트 변동번호","FK"],["user_no","int","회원번호","FK"],["bill_no","int","결제번호","FK"],["use_amt","int","사용금액"],["refund_amt","int","환급금액"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"]],
+  donut_promotion_goods: [["list_no","int","일련번호","PK"],["content_no","int","컨텐츠번호","FK"],["goods_no","int","상품번호","FK"],["goods_order","int","상품 순서"],["display_yn","char(1)","노출 여부"],["reg_dt","datetime","등록 일자"]],
+  donut_qna: [["qna_no","int","일련번호","PK"],["content_type","char(2)","문의 유형"],["user_no","int","회원번호","FK"],["admin_no","int","어드민 번호","FK"],["title","varchar(100)","제목"],["question","text","내용"],["email","varchar(50)","이메일"],["qna_file","varchar(64)","첨부파일"],["answer","text","답변 내용"],["answer_dt","datetime","답변 일자"],["reg_dt","datetime","등록 일자"],["mobile","varchar(16)","휴대폰번호"],["content_sub_type","char(2)","소분류"],["answer_status","char(1)","답변 상태"]],
+  donut_reserve_msg: [["reserve_no","int","예약번호","PK"],["bill_no","int","결제번호","FK"],["order_no","int","주문번호","FK"],["goods_id","varchar(20)","CMS 캠페인번호"],["send_channel","char(1)","발송채널"],["send_phone","varchar(35)","발신번호"],["dest_phone","varchar(35)","수신번호"],["dest_name","varchar(67)","수신자명"],["msg_title","varchar(64)","메시지 제목"],["msg_content","varchar(500)","메시지 내용"],["image_url","varchar(64)","이미지 경로"],["send_yn","char(1)","발송여부"],["reg_dt","datetime","등록일"],["card_image_no","int","카드이미지 번호"],["alimtalk_template_no","int","알림톡 템플릿"]],
+  donut_roulette: [["roulette_no","int","룰렛번호","PK"],["roulette_type","char(1)","룰렛타입"],["roulette_img","varchar(64)","룰렛이미지"],["month_limit_amt","int","월 비용한도"],["day_limit_amt","int","일 비용한도"],["use_guide","text","유의사항"],["reg_dt","datetime","등록일"],["update_dt","timestamp","수정일"]],
+  donut_roulette_apply: [["apply_no","int","참여번호","PK"],["roulette_no","int","룰렛번호","FK"],["roulette_goods_no","int","당첨상품번호","FK"],["user_no","int","회원번호","FK"],["reg_dt","datetime","등록일"],["apply_idx","varchar(7)","중복참여 인덱스"]],
+  donut_roulette_goods: [["roulette_goods_no","int","룰렛상품번호","PK"],["roulette_no","int","룰렛번호","FK"],["b2b_goods_no","int","b2b상품번호","FK"],["b2c_goods_no","int","b2c상품번호","FK"],["goods_type","char(2)","상품타입"],["goods_name","varchar(64)","상품명"],["goods_order","int","배치순서"],["goods_ratio","decimal(5,2)","당첨확률"],["point_amt","int","포인트금액"],["display_yn","char(1)","노출여부"],["reg_dt","datetime","등록일"],["update_dt","timestamp","수정일"]],
+  donut_roulette_progress: [["progress_no","int","진행번호","PK"],["roulette_goods_no","int","당첨상품번호","FK"],["mobile","varchar(35)","인증휴대폰","UK"],["reg_dt","datetime","등록일"]],
+  donut_sales_stat: [["stat_no","int uns","일련번호","PK"],["goods_no","int uns","상품번호","FK"],["sale_cnt","int uns","판매수"],["sale_amt","int uns","판매액"],["stat_dt","char(8)","통계일자"]],
+  donut_send_approval: [["approval_no","int","승인번호","PK"],["bill_no","int","결제번호","FK"],["user_no","int","회원번호","FK"],["send_status","char(1)","발송상태"],["send_dt","datetime","발송일시"],["admin_no","int","어드민번호","FK"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"]],
+  donut_sendphone: [["sendphone_no","int","일련번호","PK"],["user_no","int","회원번호","FK"],["auth_type","char(1)","인증 유형"],["send_phone","varchar(35)","인증 발신번호"],["auth_file","varchar(64)","인증요청 파일"],["approve_status","char(1)","승인 상태"],["approve_dt","datetime","승인일"],["is_main","char(1)","메인 번호"],["memo","varchar(50)","메모"],["reg_dt","datetime","등록 일자"],["noti_mobile","varchar(35)","안내문자 번호"],["reject_reason","varchar(50)","반려사유"]],
+  donut_sendphone_history: [["history_no","int","일련번호","PK"],["sendphone_no","int","인증테이블 번호","FK"],["user_no","int","회원번호","FK"],["auth_type","char(1)","인증 유형"],["send_phone","varchar(35)","발신번호"],["auth_file","varchar(64)","인증요청 파일"],["approve_status","char(1)","승인 상태"],["approve_dt","datetime","승인일"],["is_main","char(1)","메인 번호"],["memo","varchar(50)","메모"],["reg_dt","datetime","등록 일자"],["history_info","varchar(100)","이력 상세"]],
+  donut_static_goods: [["stat_no","int uns","일련번호","PK"],["stat_dt","char(8)","통계일자"],["goods_no","int uns","상품번호","FK"],["sale_cnt","int uns","판매수"],["sale_amt","int uns","판매액"],["cancel_cnt","int uns","취소수"],["cancel_amt","int uns","취소액"],["reg_dt","datetime","등록일"]],
+  donut_static_point_status: [["stat_dt","char(8)","조회일자","PK"],["per_in_point_amt","int uns","개인 적립"],["com_in_point_amt","int uns","비즈 적립"],["total_in_point_amt","int uns","적립 합계"],["per_out_point_amt","int uns","개인 차감"],["com_out_point_amt","int uns","비즈 차감"],["total_out_point_amt","int uns","차감 합계"],["total_expire_point_amt","int uns","소멸 합계"],["reg_dt","datetime","등록일시"]],
+  donut_static_sales: [["stat_no","int uns","일련번호","PK"],["stat_dt","char(8)","통계일자"],["user_type","char(1)","회원유형"],["sale_cnt","int uns","판매수"],["sale_amt","int uns","판매액"],["cancel_cnt","int uns","취소수"],["cancel_amt","int uns","취소액"],["save_point_amt","int uns","적립 포인트"],["use_point_amt","int uns","사용 포인트"],["expire_point_amt","int uns","소멸 포인트"],["reg_dt","datetime","등록일"]],
+  donut_static_sales_status: [["stat_dt","char(8)","조회일자","PK"],["per_sale_amt","int uns","개인 판매"],["com_sale_amt","int uns","비즈 판매"],["total_sale_amt","int uns","판매 합계"],["total_use_point_amt","int uns","포인트 사용 합계"],["cancel_deposit_amt","int uns","적립금 취소"],["cancel_point_amt","int uns","포인트 취소"],["com_gift_sale_amt","int uns","비즈 상품권 판매"],["com_profit_amt","int uns","비즈 낙전금액"],["reg_dt","datetime","등록일시"]],
+  donut_static_send_sales_status: [["stat_dt","char(8)","발송일자","PK"],["per_sale_amt","int","개인 판매"],["com_sale_amt","int","비즈 판매"],["total_sale_amt","int","판매 합계"],["total_use_point_amt","int","포인트 사용 합계"],["total_succ_amt","int","발송 성공 합계"],["per_b2c_order_amt","int","개인 b2c 주문"],["per_b2b_order_amt","int","개인 b2b 주문"],["com_order_amt","int","비즈 주문"],["total_order_amt","int","주문 합계"],["reg_dt","datetime","등록일시"]],
+  donut_svc_templet: [["templet_no","int","일련번호","PK"],["image_file","varchar(64)","추천 템플릿 파일"],["display_order","int","노출 순서"],["display_yn","char(1)","노출 여부"],["reg_dt","datetime","등록일자"]],
+  donut_user: [["user_no","int","회원번호","PK"],["user_id","varchar(16)","회원 아이디","UK"],["user_pwd","varchar(64)","비밀번호"],["user_name","varchar(67)","이름"],["mobile","varchar(35)","휴대폰번호"],["email","varchar(131)","이메일"],["user_status","char(2)","회원 상태"],["user_type","char(1)","회원 유형"],["agree_sms","char(1)","SMS 수신동의"],["agree_email","char(1)","Email 수신동의"],["fail_cnt","int uns","로그인 실패"],["reg_dt","datetime","가입일"],["update_dt","timestamp","수정일"],["pwd_dt","datetime","패스워드 변경일"],["login_dt","datetime","최근 로그인"],["bill_yn","char(1)","유료회원 여부"],["facebook_id","varchar(32)","페이스북 연동"],["channel","char(2)","채널"],["agree_eft","char(1)","전자금융약관 동의"],["agree_kakao","char(1)","카카오톡 수신동의"]],
+  donut_user_join_ip: [["join_no","int uns","일련번호","PK"],["join_ip","varchar(32)","가입 IP","UK"],["limit_cnt","int uns","제한 수"],["memo","varchar(100)","메모"],["reg_dt","datetime","등록일"]],
+  donut_user_option: [["option_no","int","옵션번호","PK"],["user_no","int","회원번호","FK"],["option_cd","char(3)","옵션코드"],["option_value","varchar(32)","옵션 값"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"],["option_comment","varchar(200)","옵션 코멘트"]],
+  donut_user_option_history: [["history_no","int","일련번호","PK"],["user_no","int","회원번호","FK"],["option_cd","char(3)","옵션 종류"],["option_value","varchar(32)","옵션 값"],["reg_dt","datetime","등록일시"]],
+  donut_user_quit: [["quit_no","int","일련번호","PK"],["user_no","int","회원번호","FK"],["quit_type","char(2)","탈퇴 유형"],["quit_comment","text","탈퇴 코멘트"],["reg_dt","datetime","등록일"],["user_type","char(1)","회원 유형"],["mobile","varchar(35)","휴대폰번호"],["channel","char(2)","채널"]],
+  donut_user_sleep: [["user_no","int","회원번호","PK"],["sleep_dt","datetime","휴면일"],["restore_dt","datetime","복구일"]],
+  donut_user_sleep_delete: [["delete_no","int uns","일련번호","PK"],["delete_dt","datetime","삭제일"],["delete_cnt","int uns","삭제 건수"],["sleep_dt","char(8)","휴면일","UK"],["deposit_amt","int uns","적립금"],["point_amt","int uns","포인트"]],
+  donut_user_sleep_target: [["user_no","int","회원 번호","PK"],["mailing_dt","datetime","메일 발송일시"],["reg_dt","datetime","등록일시"]],
+  event_payback_apply: [["apply_no","int","일련번호","PK"],["payback_no","int","구매 일련번호","FK"],["user_no","int","회원번호","FK"],["event_type","char(1)","이벤트유형"],["payback_amt","int","지급금액"],["reg_dt","datetime","등록일시"]],
+  event_payback_first_order: [["payback_no","int","일련번호","PK"],["user_no","int","회원번호","UK"],["user_type","char(1)","회원유형"],["bill_no","int","결제번호","FK"],["sale_amt","int","구매금액"],["order_month","char(6)","구매월"],["reg_dt","datetime","등록일시"]],
+  event_recommend: [["event_no","int","이벤트번호","PK"],["content_no","int","컨텐트번호","FK"],["reward_amt","int","리워드금액"],["biz_reward_amt","int","비즈 리워드"],["total_cnt","int","참여 제한"],["apply_cnt","int","참여 명수"]],
+  event_recommend_apply: [["apply_no","int","일련번호","PK"],["bill_no","int","결제번호","FK"],["content_no","int","이벤트번호","FK"],["recommender_user_no","int","추천인번호","FK"],["recommendee_user_no","int","피추천인번호","FK"],["user_type","char(1)","회원유형"],["paid_amt","int","지급금액"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"],["paid_dt","datetime","지급일시"]],
+  expired_coupon_income: [["income_no","int","일련번호","PK"],["valid_end","char(8)","유효종료일","UK"],["expired_coupon_income_amt","decimal(11,0)","낙전 수익액"],["refund_fee_month","char(6)","환불수수료월"],["refund_fee_amt","decimal(12,1)","환불수수료액"],["breakage_income_month","char(6)","낙전수익월"],["breakage_income_amt","decimal(12,1)","낙전수익액"],["reg_dt","timestamp","등록일시"]],
+  external_event: [["external_event_no","int","외부이벤트 번호","PK"],["url_key","varchar(20)","URL 키","UK"],["comment","varchar(100)","설명"],["reg_dt","datetime","등록일시"],["update_dt","datetime","수정일시"]],
+  external_event_apply: [["event_apply_no","int","참여 번호","PK"],["external_event_no","int","외부이벤트 번호","FK"],["goods_no","int","상품 번호","FK"],["user_no","int","회원 번호","FK"],["bill_no","int","주문 번호","FK"],["survey_yn","char(1)","응답 여부"],["purchase_agree_dt","datetime","이용동의일시"],["reg_dt","datetime","등록 일시"],["update_dt","datetime","수정 일시"]],
+  external_event_goods: [["event_goods_no","int","일련번호","PK"],["external_event_no","int","외부이벤트 번호","FK"],["goods_no","int","상품번호","UK"],["display_order","int","정렬순서"],["reg_dt","datetime","등록일"],["update_dt","datetime","수정일"]],
+  external_event_survey: [["survey_no","int","설문 번호","PK"],["event_apply_no","int","이벤트 참여 번호","FK"],["question","varchar(20)","질문 코드"],["answer","varchar(200)","답변"],["reg_dt","datetime","등록일"]],
+  giftcard_auth_log: [["auth_no","int","인증 번호","PK"],["user_no","int","회원번호","FK"],["bill_no","int","결제번호","FK"],["reg_dt","datetime","인증 시간"]],
+  goods_display_reason: [["reason_no","int","일련번호","PK"],["goods_no","int","상품번호","UK/FK"],["goods_display_reason","varchar(200)","변경사유"],["update_dt","timestamp","수정일자"]],
+  guest_qna: [["qna_no","int","일련번호","PK"],["content_type","char(2)","문의 유형"],["admin_no","int","어드민 번호","FK"],["title","varchar(100)","제목"],["question","text","내용"],["email","varchar(50)","이메일"],["qna_file","varchar(64)","첨부파일"],["answer","text","답변 내용"],["answer_dt","datetime","답변 일자"],["reg_dt","datetime","등록 일자"],["mobile","varchar(16)","휴대폰번호"],["content_sub_type","char(2)","소분류"],["answer_status","char(1)","답변 상태"]],
+  ip_blacklist: [["ip_blacklist_no","int","차단 번호","PK"],["ip_address","varchar(50)","차단 IP","UK"],["block_type","char(1)","차단 유형"],["block_reason","varchar(500)","차단 사유"],["reg_id","varchar(16)","등록자 ID"],["reg_dt","datetime","등록일시"]],
+  ip_whitelist: [["ip_whitelist_no","int","예외 IP 번호","PK"],["ip_address","varchar(50)","예외 IP","UK"],["ip_access_status","char(1)","상태"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"]],
+  ip_whitelist_history: [["ip_whitelist_history_no","int","히스토리 번호","PK"],["ip_whitelist_no","int","예외 IP 번호","FK"],["reg_reason","varchar(500)","등록 사유"],["ip_access_status","char(1)","상태"],["reg_id","varchar(16)","등록자 ID"],["reg_dt","datetime","등록일시"]],
+  kmc_auth_history: [["history_no","int","일련번호","PK"],["user_no","int","회원번호","FK"],["name","varchar(60)","이름"],["birthday","varchar(8)","생년월일"],["phone_no","varchar(11)","휴대폰번호"],["phone_corp","varchar(3)","이동통신사"],["ci","varchar(88)","연계 정보"],["di","varchar(64)","중복가입확인"],["memo","varchar(100)","요청용도"],["date","varchar(14)","요청일시"],["reg_dt","datetime","등록일시"]],
+  npay_point_convert_history: [["history_no","int","일련번호","PK"],["user_no","int","회원 번호","FK"],["channel","char(2)","채널"],["int_tx_no","varchar(30)","내부 결제번호"],["ext_tx_no","varchar(30)","대행사 결제번호"],["req_amt","int","요청 금액"],["fee_amt","int","수수료"],["convert_amt","int","전환 포인트"],["remain_amt","int","남은 포인트"],["err_code","char(5)","에러 코드"],["convert_dt","datetime","전환일"],["npay_masking_id","varchar(32)","네이버 마스킹ID"],["npay_user_key","varchar(20)","네이버 회원키"]],
+  npay_point_convert_option: [["option_no","int","일련번호","PK"],["user_type","char(1)","회원 유형"],["min_point","int","최소 교환액"],["id_convert_limit","int","월 계정 한도"],["svc_convert_limit","int","월 서비스 한도"],["display_yn","char(1)","전시 여부"],["content","text","유의사항"],["fee_percent","varchar(4)","수수료"],["admin_id","varchar(16)","관리자 계정"],["update_dt","date","수정일자"]],
+  oauth_user: [["oauth_user_no","int","일련번호","PK"],["user_no","int","회원번호","FK"],["unique_id","varchar(40)","연동 아이디"],["provider","varchar(2)","연동 제공자"],["reg_dt","datetime","등록일"],["ci","varchar(88)","연계정보"]],
+  pick_msg: [["pick_msg_no","int","일련번호","PK"],["pick_no","int","쿠팝콕 주문번호","FK"],["url_key","varchar(100)","url 식별키"],["send_phone","varchar(64)","발신 번호"],["dest_phone","varchar(64)","수신 번호"],["dest_name","varchar(64)","수신자명"],["choice_goods_no","int","선택 상품번호","FK"],["pick_status","char(2)","쿠팝콕 상태"],["choice_dt","datetime","상품선택일시"],["reg_dt","datetime","등록일시"],["retry_cnt","int","재전송 횟수"]],
+  pick_order: [["pick_no","int","일련번호","PK"],["bill_no","int","결제번호","FK"],["user_no","int","회원번호","FK"],["first_goods_no","int","첫번째 상품","FK"],["second_goods_no","int","두번째 상품","FK"],["third_goods_no","int","세번째 상품","FK"],["msg_title","varchar(64)","메시지 제목"],["msg_content","varchar(500)","메시지 내용"],["msg_banner","varchar(64)","배너"],["card_image_no","int","카드 이미지"],["alimtalk_template_no","int","알림톡 템플릿"],["total_cnt","int","총 개수"],["choice_cnt","int","선택 개수"],["cancel_cnt","int","취소 개수"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"]],
+  purchase_goods_limit: [["limit_no","int","일련번호","PK"],["goods_no","int","상품번호","FK"],["limit_type","char(2)","제한 타입"],["limit_value","varchar(100)","제한 값"],["reg_dt","datetime","등록일"],["update_dt","timestamp","수정일"]],
+  purchase_limit: [["purchase_limit_no","int","일련번호","PK"],["brand_no","int","브랜드번호","FK"],["personal_limit_amt","int","개인 금액한도"],["brand_limit_amt","int","브랜드 금액한도"],["total_sale_amt","int","총판매금액"],["personal_limit_type","char(1)","구매제한 타입"],["reg_dt","datetime","등록일"],["update_dt","timestamp","수정일"]],
+  send_msg_history: [["msg_history_no","int","히스토리 번호","PK"],["msg_no","int","발송 메시지 번호","FK"],["result_code","char(4)","발송결과 코드"],["result_msg","varchar(200)","발송결과 메시지"],["reg_dt","datetime","등록 일자"],["msg_key","varchar(200)","InfoBank 메시지KEY"],["send_msg_type","char(1)","발송 수단"],["send_msg_history_type","char(1)","이력 타입"],["failover_yn","char(1)","대체발송 여부"]],
+  sendphone_file: [["file_no","int","일련번호","PK"],["sendphone_no","int","인증테이블 번호","FK"],["file_name","varchar(300)","인증요청 파일명"],["file_path","varchar(128)","인증 파일"],["reg_dt","datetime","등록 일자"]],
+  service_option: [["option_no","int","일련번호","PK"],["option_cd","varchar(64)","옵션코드"],["option_value","varchar(32)","옵션 값"],["reg_dt","datetime","등록일시"],["update_dt","timestamp","수정일시"]],
+  sleep_statt: [["svc","char(2)","서비스 코드"],["search_key","varchar(20)","검색 Key"],["tablename","varchar(30)","별도보관 테이블명"],["statement","text","추출 쿼리"],["regdate","date","등록일"]],
+  sleep_usert: [["svc","char(2)","서비스 코드"],["search_key","varchar(20)","검색 KEY"],["fileinfo","varchar(50)","이용자정보"],["keyval","varchar(50)","검색 Value"],["applydate","date","휴면일자"],["flag","char(1)","Flag"]],
+  theme_goods: [["list_no","int","일련번호","PK"],["content_no","int","테마번호","FK"],["goods_no","int","상품번호","FK"],["goods_order","int","노출순서"],["display_yn","char(1)","노출여부"],["reg_dt","datetime","등록일자"]],
+  uds_log: [["CMID","varchar(32)","메시지ID"],["UMID","varchar(32)","UMID"],["MSG_TYPE","int","메시지 타입"],["STATUS","int","상태"],["REQUEST_TIME","datetime","요청시간"],["SEND_TIME","datetime","발송시간"],["REPORT_TIME","datetime","결과시간"],["DEST_PHONE","varchar(16)","수신번호"],["SEND_PHONE","varchar(16)","발신번호"],["DEST_NAME","varchar(32)","수신자명"],["SEND_NAME","varchar(32)","발신자명"],["SUBJECT","varchar(64)","제목"],["MSG_BODY","varchar(2000)","내용"],["TEMPLATE_CODE","varchar(30)","템플릿코드"]],
+  STATIC_TRADE_SALES: [["STAT_DT","varchar(8)","통계일자","PK"],["EXISTING_SALE_AMT","bigint","기존거래액"],["NEW_SALE_AMT","bigint","신규거래액"],["REG_DT","datetime","등록일시"]],
+  DONUT_CRM_TRACKING: [["tracking_no","bigint","일련번호","PK"],["tracking_id","varchar(64)","추적 ID"],["reg_dt","datetime","등록일시"]],
+  grade_adjust: [["adjust_no","bigint","일련번호","PK"],["user_no","int","회원번호","FK"],["prev_grade","char(2)","이전 등급"],["adj_grade","char(2)","조정 등급"],["start_dt","date","적용 시작일"],["expire_dt","date","적용 만료일"],["status","char(1)","상태"]],
+};
+// uds_log 월별 파티션은 uds_log 와 동일 구조
+["uds_log_202512","uds_log_202601","uds_log_202602","uds_log_202603","uds_log_202604","uds_log_202605"].forEach(k => COLS[k] = COLS.uds_log);
+
+// ---------- 인터랙션: 강조 ----------
+let selected = null;
+function setHL(centerId) {
+  const connected = new Set([centerId, ...(adj[centerId] || [])]);
+  edgeEls.forEach(e => {
+    const on = e.dataset.c === centerId || e.dataset.p === centerId;
+    e.classList.toggle("hl", on);
+    e.classList.toggle("dim", !on);
+  });
+  Object.values(nodeMap).forEach(n => {
+    nodeEls[n.id].classList.toggle("dim", !connected.has(n.id));
+  });
+}
+function clearHL() {
+  edgeEls.forEach(e => { e.classList.remove("hl","dim"); });
+  Object.values(nodeMap).forEach(n => nodeEls[n.id].classList.remove("dim"));
+  panel.style.display = "none";
+}
+function hoverNode(id) { if (!selected) setHL(id); }
+function escapeHtml(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function selectNode(id) {
+  selected = id; setHL(id);
+  if (editMode) { renderEditForm(id); return; }
+  const n = nodeMap[id];
+  const parents = R.filter(r => r[0] === id).map(r => r[1] + (r[2]?` (${r[2]})`:""));
+  const children = R.filter(r => r[1] === id).map(r => r[0] + (r[2]?` (${r[2]})`:""));
+  const cols = COLS[id];
+  const badge = f => f ? f.split("/").map(x=>`<span class="badge ${x.toLowerCase()}">${x}</span>`).join("") : "";
+  const colsHtml = cols
+    ? `<div class="sect">컬럼 (${cols.length})</div>
+       <table class="cols">${cols.map(c=>`<tr><td class="cn">${escapeHtml(c[0])}${badge(c[3])}</td><td class="ct">${escapeHtml(c[1])}</td><td class="cc">${escapeHtml(c[2]||"")}</td></tr>`).join("")}</table>`
+    : `<div class="sect">컬럼</div><div class="hint">컬럼 정보 없음</div>`;
+  panel.style.display = "block";
+  panel.innerHTML = `<h3>${escapeHtml(id)}</h3>
+    <span class="tag" style="background:${DOMAINS[n.domain].color}33;color:${DOMAINS[n.domain].color}">${DOMAINS[n.domain].name}</span>
+    <div>${escapeHtml(n.key)}</div>
+    ${parents.length?`<div style="margin-top:8px"><b>참조 →</b><ul>${parents.map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul></div>`:""}
+    ${children.length?`<div style="margin-top:8px"><b>← 참조됨 (${children.length})</b><ul>${children.slice(0,20).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}${children.length>20?`<li>… 외 ${children.length-20}개</li>`:""}</ul></div>`:""}
+    ${colsHtml}
+    <div class="hint">PK 기본키 · UK 유니크 · FK 참조키 · 빈 곳 클릭 시 해제</div>`;
+  panel.scrollTop = 0;
+}
+const panel = document.getElementById("panel");
+
+// ---------- 팬/줌 ----------
+let scale = 0.65, tx = 60, ty = 20, dragging = false, sx, sy;
+const vp = document.getElementById("viewport");
+const stage = document.getElementById("stage");
+function apply() { vp.setAttribute("transform", `translate(${tx},${ty}) scale(${scale})`); }
+apply();
+stage.addEventListener("mousedown", e => { dragging = true; sx = e.clientX - tx; sy = e.clientY - ty; stage.classList.add("grabbing"); if (e.target === svg || e.target.id==="viewport" || e.target===stage) { selected = null; clearHL(); } });
+window.addEventListener("mousemove", e => { if (!dragging) return; tx = e.clientX - sx; ty = e.clientY - sy; apply(); });
+window.addEventListener("mouseup", () => { dragging = false; stage.classList.remove("grabbing"); });
+stage.addEventListener("wheel", e => { e.preventDefault(); const f = e.deltaY < 0 ? 1.12 : 0.89; const rect = stage.getBoundingClientRect(); const mx = e.clientX - rect.left, my = e.clientY - rect.top; tx = mx - (mx - tx) * f; ty = my - (my - ty) * f; scale *= f; apply(); }, { passive: false });
+document.getElementById("zin").onclick = () => { scale *= 1.2; apply(); };
+document.getElementById("zout").onclick = () => { scale *= 0.83; apply(); };
+document.getElementById("reset").onclick = () => { scale = 0.65; tx = 60; ty = 20; selected = null; clearHL(); document.getElementById("search").value=""; apply(); };
+
+// ---------- 검색 ----------
+document.getElementById("search").addEventListener("input", e => {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) { clearHL(); selected=null; return; }
+  const matches = new Set(Object.keys(nodeMap).filter(id => id.toLowerCase().includes(q)));
+  edgeEls.forEach(el2 => el2.classList.add("dim"));
+  Object.values(nodeMap).forEach(n => nodeEls[n.id].classList.toggle("dim", !matches.has(n.id)));
+});
+
+// ---------- 레전드 ----------
+const legend = document.getElementById("legend");
+function buildLegend() {
+  legend.innerHTML = "<div style='font-weight:700;margin-bottom:6px'>도메인</div>" +
+    domainOrder.map(d => `<div class="row" data-d="${d}"><span class="sw" style="background:${DOMAINS[d].color}"></span>${DOMAINS[d].name} <span style="color:#66708a">(${byDomain[d].length})</span></div>`).join("");
+  legend.querySelectorAll(".row").forEach(row => {
+    row.addEventListener("click", () => {
+      const d = row.dataset.d;
+      const ids = new Set(byDomain[d].map(n => n.id));
+      edgeEls.forEach(el2 => el2.classList.add("dim"));
+      Object.values(nodeMap).forEach(n => nodeEls[n.id].classList.toggle("dim", !ids.has(n.id)));
+      selected = "domain";
+    });
+  });
+}
+
+// ============================================================
+//  스키마 편집 기능
+// ============================================================
+let editMode = false;
+const FLAGS = ["", "PK", "UK", "FK", "UK/FK"];
+
+function findTable(id){ return T.find(t => t[0] === id); }
+
+function renderEditForm(id) {
+  const n = nodeMap[id];
+  const cols = COLS[id] || (COLS[id] = []);
+  const domOpts = domainOrder.map(d => `<option value="${d}" ${d===n.domain?"selected":""}>${DOMAINS[d].name}</option>`).join("");
+  const otherTables = T.map(t=>t[0]).filter(t=>t!==id).sort();
+  const parents = R.map((r,i)=>({r,i})).filter(x=>x.r[0]===id);
+  panel.style.display = "block";
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">테이블 편집</h3>
+      <button class="mini danger" id="ed-del">테이블 삭제</button>
+    </div>
+    <label class="fl">테이블명</label>
+    <input class="fi" id="ed-name" value="${escapeHtml(id)}">
+    <label class="fl">도메인</label>
+    <select class="fi" id="ed-domain">${domOpts}</select>
+    <label class="fl">설명</label>
+    <input class="fi" id="ed-key" value="${escapeHtml(n.key)}">
+    <div class="sect">컬럼 <button class="mini" id="ed-addcol">+ 추가</button></div>
+    <div id="ed-cols">
+      ${cols.map((c,i)=>colRow(c,i)).join("")}
+    </div>
+    <div class="sect">참조 관계 (이 테이블 → 대상) <button class="mini" id="ed-addrel">+ 추가</button></div>
+    <div id="ed-rels">
+      ${parents.map(x=>relRow(x.r,x.i,otherTables)).join("") || '<div class="hint">없음</div>'}
+    </div>
+    <div style="margin-top:12px;display:flex;gap:6px">
+      <button class="mini primary" id="ed-apply">적용</button>
+      <button class="mini" id="ed-cancel">취소</button>
+    </div>
+    <div class="hint">적용을 눌러야 다이어그램에 반영됩니다.</div>`;
+  panel.scrollTop = 0;
+
+  document.getElementById("ed-addcol").onclick = () => { cols.push(["new_col","varchar(50)","",""]); renderEditForm(id); };
+  document.getElementById("ed-addrel").onclick = () => { R.push([id, otherTables[0]||id, ""]); renderEditForm(id); };
+  document.getElementById("ed-del").onclick = () => { if(confirm(`'${id}' 테이블을 삭제할까요? (관련 관계도 함께 삭제)`)) deleteTable(id); };
+  document.getElementById("ed-cancel").onclick = () => { selected=null; clearHL(); };
+  document.getElementById("ed-apply").onclick = () => applyEdit(id);
+  panel.querySelectorAll(".cdel").forEach(b => b.onclick = () => b.closest(".crow").remove());
+  panel.querySelectorAll(".rdel").forEach(b => b.onclick = () => b.closest(".rrow").remove());
+}
+function colRow(c,i){
+  return `<div class="crow" data-i="${i}">
+    <input class="ci cn2" value="${escapeHtml(c[0])}" placeholder="컬럼명">
+    <input class="ci ct2" value="${escapeHtml(c[1])}" placeholder="타입">
+    <input class="ci cc2" value="${escapeHtml(c[2]||"")}" placeholder="설명">
+    <select class="ci cf2">${FLAGS.map(f=>`<option ${f===(c[3]||"")?"selected":""}>${f}</option>`).join("")}</select>
+    <button class="mini danger cdel">×</button>
+  </div>`;
+}
+function relRow(r,idx,others){
+  return `<div class="rrow" data-idx="${idx}">
+    <span style="color:#7b8399">→</span>
+    <select class="ci rt2">${others.map(t=>`<option ${t===r[1]?"selected":""}>${t}</option>`).join("")}</select>
+    <input class="ci rl2" value="${escapeHtml(r[2]||"")}" placeholder="라벨(선택)" style="max-width:80px">
+    <button class="mini danger rdel">×</button>
+  </div>`;
+}
+function applyEdit(oldId){
+  const newName = document.getElementById("ed-name").value.trim();
+  const domain = document.getElementById("ed-domain").value;
+  const key = document.getElementById("ed-key").value.trim();
+  if(!newName){ alert("테이블명을 입력하세요."); return; }
+  if(newName!==oldId && T.some(t=>t[0]===newName)){ alert("이미 존재하는 테이블명입니다."); return; }
+  // 컬럼 수집
+  const newCols = [];
+  panel.querySelectorAll("#ed-cols .crow").forEach(row=>{
+    const nm=row.querySelector(".cn2").value.trim();
+    if(!nm) return;
+    newCols.push([nm, row.querySelector(".ct2").value.trim()||"varchar(50)", row.querySelector(".cc2").value.trim(), row.querySelector(".cf2").value]);
+  });
+  // 관계 수집 (이 테이블이 child 인 것만 갱신)
+  const newRels = [];
+  panel.querySelectorAll("#ed-rels .rrow").forEach(row=>{
+    const target=row.querySelector(".rt2").value;
+    const label=row.querySelector(".rl2").value.trim();
+    newRels.push([oldId, target, label]);
+  });
+  // 반영
+  const tRow = findTable(oldId);
+  tRow[0]=newName; tRow[1]=domain; tRow[2]=key;
+  delete COLS[oldId]; COLS[newName]=newCols;
+  // R 갱신: oldId 가 child 인 기존 관계 제거 후 재삽입, 그리고 이름 변경 반영
+  for(let k=R.length-1;k>=0;k--){ if(R[k][0]===oldId) R.splice(k,1); }
+  newRels.forEach(r=>{ r[0]=newName; R.push(r); });
+  if(newName!==oldId){ R.forEach(r=>{ if(r[1]===oldId) r[1]=newName; }); }
+  selected=newName; renderAll(); setHL(newName); renderEditForm(newName); markDirty();
+}
+function deleteTable(id){
+  const idx=T.findIndex(t=>t[0]===id); if(idx>=0) T.splice(idx,1);
+  delete COLS[id];
+  for(let k=R.length-1;k>=0;k--){ if(R[k][0]===id||R[k][1]===id) R.splice(k,1); }
+  selected=null; renderAll(); panel.style.display="none"; markDirty();
+}
+function addTable(){
+  const name=prompt("새 테이블명을 입력하세요:","new_table");
+  if(!name) return;
+  if(T.some(t=>t[0]===name)){ alert("이미 존재합니다."); return; }
+  T.push([name,"stat","새 테이블"]);
+  COLS[name]=[[name.replace(/s$/,"")+"_no","int","일련번호","PK"]];
+  renderAll(); editMode=true; setEditUI(); selectNode(name); markDirty();
+}
+
+// ---------- 내보내기 / 불러오기 ----------
+let dirty=false;
+function markDirty(){ dirty=true; document.title="* 애드콘 ERD (편집중)"; }
+function download(filename, text){
+  const blob=new Blob([text],{type:"text/plain;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function exportJSON(){ download("adcon_schema.json", JSON.stringify({domains:DOMAINS,tables:T,relations:R,columns:COLS},null,2)); dirty=false; document.title="애드콘 ERD"; }
+function importJSON(){
+  const inp=document.createElement("input"); inp.type="file"; inp.accept=".json,application/json";
+  inp.onchange=()=>{ const f=inp.files[0]; if(!f) return; const rd=new FileReader();
+    rd.onload=()=>{ try{ const d=JSON.parse(rd.result);
+      if(d.tables&&d.relations&&d.columns){ T.length=0; d.tables.forEach(x=>T.push(x)); R.length=0; d.relations.forEach(x=>R.push(x)); Object.keys(COLS).forEach(k=>delete COLS[k]); Object.assign(COLS,d.columns); selected=null; renderAll(); panel.style.display="none"; alert("불러오기 완료"); }
+      else alert("형식이 올바르지 않습니다.");
+    }catch(e){ alert("JSON 파싱 오류: "+e.message); } };
+    rd.readAsText(f); };
+  inp.click();
+}
+function mysqlType(t){ return (t||"varchar(50)").replace(/\buns\b/,"unsigned"); }
+function exportSQL(){
+  let out="-- 애드콘 ERD 편집본 export\nSET FOREIGN_KEY_CHECKS=0;\n\n";
+  T.forEach(t=>{ const id=t[0]; const cols=COLS[id]||[];
+    out+=`CREATE TABLE \`${id}\` (\n`;
+    const lines=cols.map(c=>`  \`${c[0]}\` ${mysqlType(c[1])}${c[2]?` COMMENT '${String(c[2]).replace(/'/g,"")}'`:""}`);
+    const pk=cols.filter(c=>(c[3]||"").includes("PK")).map(c=>`\`${c[0]}\``);
+    if(pk.length) lines.push(`  PRIMARY KEY (${pk.join(",")})`);
+    out+=lines.join(",\n")+`\n) COMMENT='${String(t[2]||"").replace(/'/g,"")}';\n\n`;
+  });
+  out+="\n-- 외래키 (관계)\n";
+  R.forEach((r,i)=>{ const child=r[0],parent=r[1]; const pcols=COLS[parent]||[]; const ppk=pcols.find(c=>(c[3]||"").includes("PK"));
+    const ccols=COLS[child]||[];
+    // child 컬럼 추정: parent PK 명과 동일하거나 FK 플래그가 있는 컬럼
+    let cc = ppk && ccols.find(c=>c[0]===ppk[0] && (c[3]||"").includes("FK"));
+    if(!cc && ppk) cc = ccols.find(c=>c[0]===ppk[0]);
+    if(!cc) cc = ccols.find(c=>(c[3]||"").includes("FK"));
+    if(cc && ppk) out+=`ALTER TABLE \`${child}\` ADD CONSTRAINT \`fk_${child}_${i}\` FOREIGN KEY (\`${cc[0]}\`) REFERENCES \`${parent}\` (\`${ppk[0]}\`);\n`;
+  });
+  out+="\nSET FOREIGN_KEY_CHECKS=1;\n";
+  download("adcon_schema_edited.sql", out); dirty=false; document.title="애드콘 ERD";
+}
+function exportDBML(){
+  let out="// 애드콘 ERD 편집본 (DBML)\n\n";
+  T.forEach(t=>{ const id=t[0]; const cols=COLS[id]||[];
+    out+=`Table ${id} {\n`;
+    cols.forEach(c=>{ const settings=[]; const f=c[3]||"";
+      if(f.includes("PK")) settings.push("pk"); if(f==="UK") settings.push("unique");
+      if(c[2]) settings.push(`note: '${String(c[2]).replace(/'/g,"")}'`);
+      out+=`  ${c[0]} ${(c[1]||"varchar").split(" ")[0]}${settings.length?` [${settings.join(", ")}]`:""}\n`;
+    });
+    out+=`  Note: '${String(t[2]||"").replace(/'/g,"")}'\n}\n\n`;
+  });
+  R.forEach(r=>{ const parent=r[1]; const ppk=(COLS[parent]||[]).find(c=>(c[3]||"").includes("PK"));
+    const child=r[0]; const ccols=COLS[child]||[]; let cc = ppk && (ccols.find(c=>c[0]===ppk[0]) || ccols.find(c=>(c[3]||"").includes("FK")));
+    if(cc&&ppk) out+=`Ref: ${child}.${cc[0]} > ${parent}.${ppk[0]}\n`;
+  });
+  download("adcon_schema_edited.dbml", out);
+}
+
+// ---------- 편집 UI 토글 ----------
+const toolbar = document.getElementById("toolbar");
+function setEditUI(){
+  document.getElementById("editToggle").textContent = editMode ? "✏ 편집 중 (보기로)" : "✏ 편집 모드";
+  document.getElementById("editToggle").classList.toggle("on", editMode);
+  toolbar.style.display = editMode ? "flex" : "none";
+  document.body.classList.toggle("editing", editMode);
+}
+document.getElementById("editToggle").onclick = () => { editMode=!editMode; setEditUI(); selected=null; clearHL(); };
+document.getElementById("tbAdd").onclick = addTable;
+document.getElementById("tbSaveJson").onclick = exportJSON;
+document.getElementById("tbLoadJson").onclick = importJSON;
+document.getElementById("tbSql").onclick = exportSQL;
+document.getElementById("tbDbml").onclick = exportDBML;
+window.addEventListener("beforeunload", e => { if(dirty){ e.preventDefault(); e.returnValue=""; } });
+
+// ---------- 최초 렌더 ----------
+renderAll();
+</script>
+</body>
+</html>
